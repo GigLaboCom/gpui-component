@@ -176,6 +176,10 @@ impl LineDecorationProviders {
         self.entries.get(&id).is_some_and(Option::is_some)
     }
 
+    pub(crate) fn has_any_provider(&self) -> bool {
+        self.entries.values().any(Option::is_some)
+    }
+
     /// Ask every provider about `rows`, in creation order, keeping only the
     /// decorations that fall within `rows`.
     pub(crate) fn query(&self, rows: Range<usize>, cx: &App) -> Vec<LineDecoration> {
@@ -205,9 +209,10 @@ impl InputBaseState<EditorMode> {
     ///
     /// A background spans the row from the gutter to the right edge, across its
     /// soft wraps, under the active line, indent guides, selections and text. A
-    /// marker is painted at the left of the line number area, only while line
-    /// numbers are shown. Later collections paint over earlier ones. Neither
-    /// affects text layout, hit testing or focus. Collections live until
+    /// marker is painted in a slot at the left of the line numbers, only while
+    /// they are shown; the gutter reserves the slot while any collection has a
+    /// provider and a marker renderer is set. Later collections paint over earlier
+    /// ones. Neither affects hit testing or focus. Collections live until
     /// explicitly disposed or the editor is dropped.
     pub fn create_line_decorations_collection(
         &mut self,

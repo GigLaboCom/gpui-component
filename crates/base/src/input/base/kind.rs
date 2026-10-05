@@ -98,6 +98,11 @@ pub trait InputExtras: Default + 'static {
         Vec::new()
     }
 
+    /// Whether any line decoration collection has a provider.
+    fn has_line_decorations(&self) -> bool {
+        false
+    }
+
     /// Semantic-token styles for a visible range, when an LSP supplies them.
     fn semantic_token_styles(
         &self,

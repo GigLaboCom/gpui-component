@@ -308,12 +308,14 @@ added.dispose(cx); // 释放集合，使该句柄及其克隆全部失效。
 后创建的集合绘制在先创建的集合之上。
 
 背景从行号槽一直延伸到右边缘，覆盖该行软换行后的全部显示行，位于当前行高亮、缩进参考线、
-选区和文字下方。标记绘制在行号槽的左边缘，因此只在显示行号时出现。`DiffAdded`、`DiffRemoved`、
+选区和文字下方。标记绘制在行号左侧的独立槽位中，因此只在显示行号时出现。只要有集合设置了
+provider，行号槽就会保留该槽位，标记行滚入或滚出视图时宽度不变。`DiffAdded`、`DiffRemoved`、
 `DiffChanged`、`Conflict`、`Bookmark` 和 `Breakpoint` 使用主题的 success、danger、warning 和
-info 颜色；`GutterMarker::Custom { icon, color }` 按原样绘制给定的图标资源路径。两者都不改变
-文本布局、命中测试或焦点，也不提供鼠标或键盘操作。
+info 颜色；`GutterMarker::Custom { icon, color }` 按原样绘制给定的图标资源路径。两者都不影响
+命中测试或焦点，也不提供鼠标或键盘操作。
 
-`EditorState::row_bounds(row)` 返回某一行在窗口坐标中占据的区域；该行尚未布局时返回 `None`。
+`EditorState::row_bounds(row)` 返回某一行在窗口坐标中实际绘制的区域：多行内联补全下方的行会随
+文字一起下移。该行尚未布局时返回 `None`。
 Editor 展示页的 **Decorations** 标签用 provider 标记了最后三行。
 
 ## 值与事件

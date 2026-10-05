@@ -356,15 +356,17 @@ over earlier ones.
 
 A background spans the row from the gutter to the right edge, across all of its
 soft-wrapped lines, under the active line, indent guides, selection and text. A marker
-is painted at the left edge of the line-number gutter, so it is shown only while line
-numbers are. `DiffAdded`, `DiffRemoved`, `DiffChanged`, `Conflict`, `Bookmark` and
-`Breakpoint` take the theme's success, danger, warning and info colors;
-`GutterMarker::Custom { icon, color }` paints an icon asset path as given. Neither
-changes text layout, hit testing or focus, and neither has a pointer or keyboard
-action.
+is painted in a slot of its own at the left of the line numbers, so it is shown only
+while line numbers are. The gutter reserves the slot while any collection has a
+provider, and keeps it as marked rows scroll in and out of view. `DiffAdded`,
+`DiffRemoved`, `DiffChanged`, `Conflict`, `Bookmark` and `Breakpoint` take the
+theme's success, danger, warning and info colors; `GutterMarker::Custom { icon, color }`
+paints an icon asset path as given. Neither affects hit testing or focus, and neither
+has a pointer or keyboard action.
 
 `EditorState::row_bounds(row)` returns the band a row occupies in window coordinates,
-or `None` while the row is not laid out. The **Decorations** tab of the Editor showcase
+where it is painted: below a multi-line inline completion, rows move down with the
+text. It returns `None` while the row is not laid out. The **Decorations** tab of the Editor showcase
 marks its last three rows with a provider.
 
 ## Value and events

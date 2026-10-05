@@ -249,6 +249,10 @@ impl crate::input::InputExtras for super::EditorExtras {
         self.line_decorations.query(rows, cx)
     }
 
+    fn has_line_decorations(&self) -> bool {
+        self.line_decorations.has_any_provider()
+    }
+
     fn semantic_token_styles(
         &self,
         text: &ropey::Rope,
