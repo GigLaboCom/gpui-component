@@ -107,7 +107,10 @@ pub struct DiagnosticColors {
 }
 
 /// Application-owned colors and highlight resolver consumed by editor painting.
+///
+/// Start from [`Default`] and assign the fields to change.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct InputEditorStyle {
     pub foreground: Hsla,
     pub muted_foreground: Hsla,

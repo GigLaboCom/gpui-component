@@ -526,6 +526,45 @@ impl Input {
     }
 }
 
+/// The editor style projected from the theme.
+fn editor_style(cx: &App) -> gpui_base::input::InputEditorStyle {
+    let theme = cx.theme();
+    let highlight = &theme.highlight_theme.style;
+    let mut style = gpui_base::input::InputEditorStyle::default();
+    style.foreground = theme.foreground;
+    style.muted_foreground = theme.muted_foreground;
+    style.background = theme.editor_background();
+    style.border = theme.border;
+    style.selection = theme.selection;
+    style.caret = theme.caret;
+    style.diagnostics = gpui_base::input::DiagnosticColors {
+        error: highlight.status.error(cx),
+        warning: highlight.status.warning(cx),
+        info: highlight.status.info(cx),
+        hint: highlight.status.hint(cx),
+    };
+    style.highlight_styles = theme.highlight_theme.clone();
+    style.editor_invisible = highlight.editor_invisible;
+    style.editor_active_line = highlight.editor_active_line;
+    style.editor_gutter_background = highlight.editor_gutter_background;
+    style.fold_icon_renderer = Some(Rc::new(|ix, is_folded| {
+        Button::new(("fold-icon", ix))
+            .ghost()
+            .icon(if is_folded {
+                IconName::ChevronRight
+            } else {
+                IconName::ChevronDown
+            })
+            .xsmall()
+            .rounded(ButtonRounded::Small)
+            .size(px(14.))
+            .selected(is_folded)
+            .into_any_element()
+    }));
+    style.gutter_marker_renderer = Some(gutter_marker_renderer(cx));
+    style
+}
+
 /// Renders each line decoration gutter marker as an icon in a theme color.
 fn gutter_marker_renderer(cx: &App) -> gpui_base::input::GutterMarkerRenderer {
     use gpui_base::input::GutterMarker;
@@ -575,42 +614,7 @@ impl RenderOnce for Input {
         sync_focused_input_registry(&state, window, cx);
 
         state.ensure_highlighter_factory(crate::highlighter::input_highlighter_factory(), cx);
-        state.set_editor_style(
-            gpui_base::input::InputEditorStyle {
-                foreground: cx.theme().foreground,
-                muted_foreground: cx.theme().muted_foreground,
-                background: cx.theme().editor_background(),
-                border: cx.theme().border,
-                selection: cx.theme().selection,
-                caret: cx.theme().caret,
-                diagnostics: gpui_base::input::DiagnosticColors {
-                    error: cx.theme().highlight_theme.style.status.error(cx),
-                    warning: cx.theme().highlight_theme.style.status.warning(cx),
-                    info: cx.theme().highlight_theme.style.status.info(cx),
-                    hint: cx.theme().highlight_theme.style.status.hint(cx),
-                },
-                highlight_styles: cx.theme().highlight_theme.clone(),
-                editor_invisible: cx.theme().highlight_theme.style.editor_invisible,
-                editor_active_line: cx.theme().highlight_theme.style.editor_active_line,
-                editor_gutter_background: cx.theme().highlight_theme.style.editor_gutter_background,
-                fold_icon_renderer: Some(Rc::new(|ix, is_folded| {
-                    Button::new(("fold-icon", ix))
-                        .ghost()
-                        .icon(if is_folded {
-                            IconName::ChevronRight
-                        } else {
-                            IconName::ChevronDown
-                        })
-                        .xsmall()
-                        .rounded(ButtonRounded::Small)
-                        .size(px(14.))
-                        .selected(is_folded)
-                        .into_any_element()
-                })),
-                gutter_marker_renderer: Some(gutter_marker_renderer(cx)),
-            },
-            cx,
-        );
+        state.set_editor_style(editor_style(cx), cx);
         state.set_editor_paddings(
             if state.presentation(cx).is_multi_line() {
                 Edges {
