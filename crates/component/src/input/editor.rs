@@ -468,6 +468,78 @@ mod tests {
     }
 
     #[gpui::test]
+    fn gutter_markers_follow_editor_font_changes_without_changing_rem(cx: &mut TestAppContext) {
+        use crate::input::{GutterMarker, LineDecoration, LineDecorationProvider};
+        use std::ops::Range;
+
+        struct Marker;
+
+        impl LineDecorationProvider for Marker {
+            fn line_decorations(&self, rows: Range<usize>, _: &App) -> Vec<LineDecoration> {
+                rows.map(|row| LineDecoration::new(row).with_marker(GutterMarker::DiffAdded))
+                    .collect()
+            }
+        }
+
+        cx.update(crate::init);
+        let mut editor = None;
+        let mut harness = None;
+        let (_, cx) = cx.add_window_view(|window, cx| {
+            let state = cx.new(|cx| EditorState::new(window, cx).default_value("first\nsecond"));
+            editor = Some(state.clone());
+            harness = Some(cx.entity());
+            Harness {
+                state,
+                text_size: None,
+            }
+        });
+        let editor = editor.unwrap();
+        let harness = harness.unwrap();
+        VisualTestContext::update(cx, |window, cx| {
+            let rem_size = window.rem_size();
+            let mut previous = None;
+            for font_size in [px(11.), px(20.)] {
+                harness.update(cx, |view, cx| {
+                    view.text_size = Some(font_size);
+                    cx.notify();
+                });
+                window.draw(cx).clear(cx);
+                let unmarked = editor.read(cx).range_to_bounds(&(0..0)).unwrap().left();
+                let collection = editor.update(cx, |state, cx| {
+                    state.create_line_decorations_collection(Rc::new(Marker), cx)
+                });
+                window.draw(cx).clear(cx);
+                let state = editor.read(cx);
+                let slot = state.range_to_bounds(&(0..0)).unwrap().left() - unmarked;
+                let row_height = state.row_bounds(0).unwrap().size.height;
+                assert!(slot > px(0.));
+                if let Some((previous_slot, previous_font, previous_height)) = previous {
+                    assert!(
+                        slot > previous_slot,
+                        "the marker slot did not follow the font"
+                    );
+                    assert!(row_height > previous_height);
+                    // Row heights round to device pixels; compare the marker's
+                    // scale against font size rather than rounded row height.
+                    let expected = previous_slot * (font_size / previous_font);
+                    assert!(
+                        (slot - expected).abs() < px(0.01),
+                        "marker and text scale diverged: slot {slot:?}, previous slot {previous_slot:?}, font {font_size:?}, previous font {previous_font:?}"
+                    );
+                }
+                previous = Some((slot, font_size, row_height));
+                assert_eq!(window.rem_size(), rem_size);
+                collection.clear(cx);
+                window.draw(cx).clear(cx);
+                assert_eq!(
+                    editor.read(cx).range_to_bounds(&(0..0)).unwrap().left(),
+                    unmarked
+                );
+            }
+        });
+    }
+
+    #[gpui::test]
     fn test_on_paste_builder(cx: &mut TestAppContext) {
         use gpui::{AppContext as _, Render};
 

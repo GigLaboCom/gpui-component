@@ -358,7 +358,10 @@ A background spans the row from the gutter to the right edge, across all of its
 soft-wrapped lines, under the active line, indent guides, selection and text. A marker
 is painted in a slot of its own at the left of the line numbers, so it is shown only
 while line numbers are. The gutter reserves the slot while any collection has a
-provider, and keeps it as marked rows scroll in and out of view. `DiffAdded`,
+provider, and keeps it as marked rows scroll in and out of view. The styled editor
+sizes the marker at 90% of its effective font size and the gap at 30%. The icon,
+reserved slot and vertical centering share the same size, so markers follow both
+interface zoom and an editor-specific `.text_size(...)` change. `DiffAdded`,
 `DiffRemoved`, `DiffChanged`, `Conflict`, `Bookmark` and `Breakpoint` take the
 theme's success, danger, warning and info colors; `GutterMarker::Custom { icon, color }`
 paints an icon asset path as given. Neither affects hit testing or focus, and neither

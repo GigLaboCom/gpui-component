@@ -1,6 +1,6 @@
 use std::{ops::Range, rc::Rc, sync::Arc};
 
-use gpui::{AnyElement, Context, HighlightStyle, Hsla, SharedString, Window};
+use gpui::{AbsoluteLength, AnyElement, Context, HighlightStyle, Hsla, SharedString, Window, px};
 use ropey::Rope;
 
 use super::{EditorState, FoldRange, GutterMarker, InputEdit};
@@ -76,7 +76,7 @@ pub trait InputHighlighter {
 pub type InputHighlighterFactory = Rc<dyn Fn(&str) -> Option<Box<dyn InputHighlighter>>>;
 pub type SharedHighlightStyleResolver = Arc<dyn HighlightStyleResolver>;
 pub type FoldIconRenderer = Rc<dyn Fn(usize, bool) -> AnyElement>;
-/// Renders a [`GutterMarker`]; the editor sizes and places the element.
+/// Renders a [`GutterMarker`] within the size supplied by [`InputEditorStyle`].
 pub type GutterMarkerRenderer = Rc<dyn Fn(&GutterMarker) -> AnyElement>;
 
 /// Where in the syntax tree an offset sits, for editing decisions.
@@ -108,7 +108,8 @@ pub struct DiagnosticColors {
 
 /// Application-owned colors and highlight resolver consumed by editor painting.
 ///
-/// Start from [`Default`] and assign the fields to change.
+/// Start from [`Default`]. Configure gutter markers through its builders;
+/// existing fields retain their direct-access API.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct InputEditorStyle {
@@ -125,10 +126,47 @@ pub struct InputEditorStyle {
     pub editor_gutter_background: Option<Hsla>,
     pub fold_icon_renderer: Option<FoldIconRenderer>,
     /// Renders line decoration gutter markers; without one, markers are not painted.
-    pub gutter_marker_renderer: Option<GutterMarkerRenderer>,
+    gutter_marker_renderer: Option<GutterMarkerRenderer>,
+    gutter_marker_size: AbsoluteLength,
+    gutter_marker_gap: AbsoluteLength,
 }
 
 impl InputEditorStyle {
+    /// Set the gutter marker renderer, or `None` to stop rendering markers.
+    pub fn with_gutter_marker_renderer(mut self, renderer: Option<GutterMarkerRenderer>) -> Self {
+        self.gutter_marker_renderer = renderer;
+        self
+    }
+
+    /// The gutter marker renderer, if one has been supplied.
+    pub fn gutter_marker_renderer(&self) -> Option<&GutterMarkerRenderer> {
+        self.gutter_marker_renderer.as_ref()
+    }
+
+    /// Set the square marker size. The presentation layer supplies its scale.
+    ///
+    /// Defaults to zero; configure this together with the renderer.
+    pub fn with_gutter_marker_size(mut self, size: impl Into<AbsoluteLength>) -> Self {
+        self.gutter_marker_size = size.into();
+        self
+    }
+
+    /// The square marker size, resolved against the window's rem during layout.
+    pub fn gutter_marker_size(&self) -> AbsoluteLength {
+        self.gutter_marker_size
+    }
+
+    /// Set the gap between markers and line numbers. Defaults to zero.
+    pub fn with_gutter_marker_gap(mut self, gap: impl Into<AbsoluteLength>) -> Self {
+        self.gutter_marker_gap = gap.into();
+        self
+    }
+
+    /// The gap between markers and line numbers.
+    pub fn gutter_marker_gap(&self) -> AbsoluteLength {
+        self.gutter_marker_gap
+    }
+
     /// Fills in every colour that was left unset, from the active palette.
     ///
     /// `Hsla::default()` is fully transparent, and every colour on `Default` is
@@ -182,16 +220,19 @@ impl Default for InputEditorStyle {
             editor_gutter_background: None,
             fold_icon_renderer: None,
             gutter_marker_renderer: None,
+            gutter_marker_size: px(0.).into(),
+            gutter_marker_gap: px(0.).into(),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use gpui::hsla;
+    use gpui::{IntoElement as _, hsla, px, rems};
 
-    use super::InputEditorStyle;
+    use super::{GutterMarkerRenderer, InputEditorStyle};
     use crate::SemanticThemeTokens;
+    use std::rc::Rc;
 
     fn dark() -> SemanticThemeTokens {
         let mut tokens = SemanticThemeTokens::default();
@@ -201,6 +242,29 @@ mod tests {
         tokens.colors.border = hsla(0., 0., 0.15, 1.0);
         tokens.colors.accent = hsla(0.6, 0.5, 0.5, 1.0);
         tokens
+    }
+
+    #[test]
+    fn test_input_editor_style_builder() {
+        let renderer: GutterMarkerRenderer = Rc::new(|_| gpui::Empty.into_any_element());
+        let style = InputEditorStyle::default()
+            .with_gutter_marker_renderer(Some(renderer.clone()))
+            .with_gutter_marker_size(rems(0.75))
+            .with_gutter_marker_gap(rems(0.25));
+        // Palette resolution and cloning must preserve the presentation seam.
+        let resolved = style.clone().resolved(&dark());
+        assert!(Rc::ptr_eq(
+            resolved.gutter_marker_renderer().unwrap(),
+            &renderer
+        ));
+        assert_eq!(resolved.gutter_marker_size().to_pixels(px(32.)), px(24.));
+        assert_eq!(resolved.gutter_marker_gap().to_pixels(px(32.)), px(8.));
+        assert!(
+            resolved
+                .with_gutter_marker_renderer(None)
+                .gutter_marker_renderer()
+                .is_none()
+        );
     }
 
     #[test]

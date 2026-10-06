@@ -51,10 +51,6 @@ pub(super) const RIGHT_MARGIN: Pixels = px(10.);
 pub(super) const LINE_NUMBER_RIGHT_MARGIN: Pixels = px(6.);
 const FOLD_ICON_WIDTH: Pixels = px(14.);
 const FOLD_ICON_HITBOX_WIDTH: Pixels = px(18.);
-/// Width and height of a line decoration gutter marker.
-const GUTTER_MARKER_SIZE: Pixels = px(12.);
-/// Space between a gutter marker and the line numbers.
-const GUTTER_MARKER_GAP: Pixels = px(4.);
 const MAX_HIGHLIGHT_LINE_LENGTH: usize = 10_000;
 const MIN_LINE_NUMBER_DIGITS: usize = 3;
 const MAX_LINE_NUMBER_DIGITS: usize = 7;
@@ -1127,7 +1123,9 @@ impl<M: InputModeKind> TextElement<M> {
                 None,
             );
 
-            Self::gutter_marker_width(state) + empty_line_number.width + LINE_NUMBER_RIGHT_MARGIN
+            Self::gutter_marker_width(state, window)
+                + empty_line_number.width
+                + LINE_NUMBER_RIGHT_MARGIN
         } else if state.is_code_editor() {
             LINE_NUMBER_RIGHT_MARGIN
         } else {
@@ -1147,12 +1145,24 @@ impl<M: InputModeKind> TextElement<M> {
     /// The slot is reserved while line numbers are shown, a marker renderer is set
     /// and a line decoration collection has a provider, so the gutter keeps its
     /// width as marked rows scroll in and out of view.
-    fn gutter_marker_width(state: &InputBaseState<M>) -> Pixels {
+    fn gutter_marker_width(state: &InputBaseState<M>, window: &Window) -> Pixels {
         if state.mode.line_number()
-            && state.editor_style.gutter_marker_renderer.is_some()
+            && state.editor_style.gutter_marker_renderer().is_some()
             && state.extras.has_line_decorations()
         {
-            GUTTER_MARKER_SIZE + GUTTER_MARKER_GAP
+            let size = state
+                .editor_style
+                .gutter_marker_size()
+                .to_pixels(window.rem_size());
+            if size > Pixels::ZERO {
+                size + state
+                    .editor_style
+                    .gutter_marker_gap()
+                    .to_pixels(window.rem_size())
+                    .max(px(0.))
+            } else {
+                px(0.)
+            }
         } else {
             px(0.)
         }
@@ -1464,14 +1474,21 @@ impl<M: InputModeKind> TextElement<M> {
         ) else {
             return LineDecorationLayout::default();
         };
-        let (decorations, renderer) = {
+        let (decorations, renderer, marker_size) = {
             let state = self.state.read(cx);
             let renderer = state
                 .mode
                 .line_number()
-                .then(|| state.editor_style.gutter_marker_renderer.clone())
+                .then(|| state.editor_style.gutter_marker_renderer().cloned())
                 .flatten();
-            (state.extras.line_decorations(first..last + 1, cx), renderer)
+            (
+                state.extras.line_decorations(first..last + 1, cx),
+                renderer,
+                state
+                    .editor_style
+                    .gutter_marker_size()
+                    .to_pixels(window.rem_size()),
+            )
         };
         if decorations.is_empty() {
             return LineDecorationLayout::default();
@@ -1494,18 +1511,15 @@ impl<M: InputModeKind> TextElement<M> {
             if let Some(color) = decoration.background() {
                 layout.backgrounds.push((top, height, color));
             }
-            if let (Some(marker), Some(render)) = (decoration.marker(), renderer.as_ref()) {
+            if let (Some(marker), Some(render)) = (decoration.marker(), renderer.as_ref())
+                && marker_size > Pixels::ZERO
+            {
                 let origin = point(
                     origin_x,
-                    bounds.origin.y + top + (line_height - GUTTER_MARKER_SIZE).half(),
+                    bounds.origin.y + top + (line_height - marker_size).half(),
                 );
                 let mut element = render(marker);
-                element.prepaint_as_root(
-                    origin,
-                    size(GUTTER_MARKER_SIZE, GUTTER_MARKER_SIZE).into(),
-                    window,
-                    cx,
-                );
+                element.prepaint_as_root(origin, size(marker_size, marker_size).into(), window, cx);
                 layout.markers.push(element);
             }
         }
@@ -2740,7 +2754,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             wrap_width,
             wrapping_indent,
             line_number_width,
-            gutter_marker_width: Self::gutter_marker_width(state),
+            gutter_marker_width: Self::gutter_marker_width(state, window),
             ghost_lines: None,
             space_width,
             lines: Rc::new(vec![]),
@@ -3812,13 +3826,15 @@ mod tests {
         let built = Rc::new(std::cell::Cell::new(0));
         let counter = built.clone();
         editor.update(cx, |state, _| {
-            state.set_editor_style(crate::input::InputEditorStyle {
-                gutter_marker_renderer: Some(Rc::new(move |_| {
-                    counter.set(counter.get() + 1);
-                    div().into_any_element()
-                })),
-                ..Default::default()
-            });
+            state.set_editor_style(
+                crate::input::InputEditorStyle::default()
+                    .with_gutter_marker_renderer(Some(Rc::new(move |_| {
+                        counter.set(counter.get() + 1);
+                        div().into_any_element()
+                    })))
+                    .with_gutter_marker_size(gpui::rems(0.75))
+                    .with_gutter_marker_gap(gpui::rems(0.25)),
+            );
         });
         built
     }
@@ -3831,18 +3847,20 @@ mod tests {
         let laid_out = Rc::new(std::cell::RefCell::new(Vec::new()));
         let record = laid_out.clone();
         editor.update(cx, |state, _| {
-            state.set_editor_style(crate::input::InputEditorStyle {
-                gutter_marker_renderer: Some(Rc::new(move |_| {
-                    let record = record.clone();
-                    gpui::canvas(
-                        move |bounds, _, _| record.borrow_mut().push(bounds),
-                        |_, _, _, _| {},
-                    )
-                    .size_full()
-                    .into_any_element()
-                })),
-                ..Default::default()
-            });
+            state.set_editor_style(
+                crate::input::InputEditorStyle::default()
+                    .with_gutter_marker_renderer(Some(Rc::new(move |_| {
+                        let record = record.clone();
+                        gpui::canvas(
+                            move |bounds, _, _| record.borrow_mut().push(bounds),
+                            |_, _, _, _| {},
+                        )
+                        .size(gpui::rems(0.75))
+                        .into_any_element()
+                    })))
+                    .with_gutter_marker_size(gpui::rems(0.75))
+                    .with_gutter_marker_gap(gpui::rems(0.25)),
+            );
         });
         laid_out
     }
@@ -3959,75 +3977,95 @@ mod tests {
     #[gpui::test]
     fn gutter_markers_have_a_slot_left_of_the_line_numbers(cx: &mut TestAppContext) {
         // Three-digit numbers fill the narrowest column; longer ones widen it.
-        for (lines, widest) in [(150, 99), (1_200, 999)] {
-            let text = format!("{}\n{}", "wide ".repeat(80), "x\n".repeat(lines));
-            let (editor, window) = decoration_editor(cx, &text, false);
-            let mut cx = VisualTestContext::from_window(window.into(), cx);
-            cx.update(|window, cx| {
-                let laid_out = record_markers(&editor, cx);
-                let padding = px(6.);
-                editor.update(cx, |state, _| {
-                    state.set_editor_paddings(Edges {
-                        left: padding,
-                        ..Default::default()
+        for rem_size in [16., 24., 32.] {
+            for (lines, widest) in [(150, 99), (1_200, 999)] {
+                let text = format!("{}\n{}", "wide ".repeat(80), "x\n".repeat(lines));
+                let (editor, window) = decoration_editor(cx, &text, false);
+                let mut cx = VisualTestContext::from_window(window.into(), cx);
+                cx.update(|window, cx| {
+                    window.set_rem_size(px(rem_size));
+                    let laid_out = record_markers(&editor, cx);
+                    let padding = px(6.);
+                    editor.update(cx, |state, _| {
+                        state.set_editor_paddings(Edges {
+                            left: padding,
+                            ..Default::default()
+                        });
                     });
-                });
-                window.draw(cx).clear(cx);
-                let line_number_width = |cx: &App| {
-                    editor
-                        .read(cx)
-                        .last_layout
-                        .as_ref()
-                        .unwrap()
-                        .line_number_width
-                };
-                let plain = line_number_width(cx);
+                    window.draw(cx).clear(cx);
+                    let line_number_width = |cx: &App| {
+                        editor
+                            .read(cx)
+                            .last_layout
+                            .as_ref()
+                            .unwrap()
+                            .line_number_width
+                    };
+                    let plain = line_number_width(cx);
 
-                let collection = editor.update(cx, |state, cx| {
-                    let height = state.last_layout.as_ref().unwrap().line_height;
-                    state.set_scroll_offset(point(px(0.), -height * (lines - 4) as f32), cx);
-                    state.create_line_decorations_collection(Bands::new(true), cx)
-                });
-                window.draw(cx).clear(cx);
-                window.draw(cx).clear(cx);
-                assert!(editor.read(cx).visible_row_range().unwrap().start > widest);
+                    let collection = editor.update(cx, |state, cx| {
+                        let height = state.last_layout.as_ref().unwrap().line_height;
+                        state.set_scroll_offset(point(px(0.), -height * (lines - 4) as f32), cx);
+                        state.create_line_decorations_collection(Bands::new(true), cx)
+                    });
+                    window.draw(cx).clear(cx);
+                    laid_out.borrow_mut().clear();
+                    window.draw(cx).clear(cx);
+                    assert!(editor.read(cx).visible_row_range().unwrap().start > widest);
 
-                // The numbers keep their right edge, so the growth is the slot.
-                let slot = line_number_width(cx) - plain;
-                let input_bounds = editor.read(cx).input_bounds;
-                let markers_x = || {
-                    let markers = laid_out.borrow();
-                    assert!(!markers.is_empty());
-                    for marker in markers.iter() {
-                        assert!(
-                            marker.left() >= input_bounds.left() - padding
-                                && marker.right() <= input_bounds.left() + slot,
-                            "{marker:?} is not in the slot left of {lines} line numbers"
-                        );
-                    }
-                    markers
+                    // The numbers keep their right edge, so the growth is the slot.
+                    let slot = line_number_width(cx) - plain;
+                    let input_bounds = editor.read(cx).input_bounds;
+                    let state = editor.read(cx);
+                    let layout = state.last_layout.as_ref().unwrap();
+                    let row_centers = layout
+                        .visible_buffer_lines
                         .iter()
-                        .map(|marker| marker.left())
-                        .collect::<Vec<_>>()
-                };
-                let unscrolled = markers_x();
+                        .map(|&row| {
+                            state.row_bounds(row).unwrap().top() + layout.line_height.half()
+                        })
+                        .collect::<Vec<_>>();
+                    let markers_x = || {
+                        let markers = laid_out.borrow();
+                        assert!(!markers.is_empty());
+                        for marker in markers.iter() {
+                            assert!(
+                                marker.left() >= input_bounds.left() - padding
+                                    && marker.right() <= input_bounds.left() + slot,
+                                "{marker:?} is not in the slot left of {lines} line numbers"
+                            );
+                            assert!(
+                                row_centers
+                                    .iter()
+                                    .any(|&center| (marker.center().y - center).abs() < px(0.01)),
+                                "{marker:?} is not centered on a row at rem {rem_size}"
+                            );
+                        }
+                        markers
+                            .iter()
+                            .map(|marker| marker.left())
+                            .collect::<Vec<_>>()
+                    };
+                    let unscrolled = markers_x();
 
-                // Scrolling horizontally moves the text, not the gutter.
-                laid_out.borrow_mut().clear();
-                editor.update(cx, |state, cx| {
-                    let offset = state.scroll_handle.offset();
-                    state.set_scroll_offset(point(px(-200.), offset.y), cx);
+                    // Scrolling horizontally moves the text, not the gutter.
+                    laid_out.borrow_mut().clear();
+                    editor.update(cx, |state, cx| {
+                        let offset = state.scroll_handle.offset();
+                        state.set_scroll_offset(point(px(-200.), offset.y), cx);
+                    });
+                    window.draw(cx).clear(cx);
+                    laid_out.borrow_mut().clear();
+                    window.draw(cx).clear(cx);
+                    assert!(editor.read(cx).scroll_handle.offset().x < px(0.));
+                    assert_eq!(markers_x()[..unscrolled.len()], unscrolled[..]);
+
+                    // Without a provider there is no slot.
+                    collection.clear(cx);
+                    window.draw(cx).clear(cx);
+                    assert_eq!(line_number_width(cx), plain);
                 });
-                window.draw(cx).clear(cx);
-                window.draw(cx).clear(cx);
-                assert!(editor.read(cx).scroll_handle.offset().x < px(0.));
-                assert_eq!(markers_x()[..unscrolled.len()], unscrolled[..]);
-
-                // Without a provider there is no slot.
-                collection.clear(cx);
-                window.draw(cx).clear(cx);
-                assert_eq!(line_number_width(cx), plain);
-            });
+            }
         }
     }
 

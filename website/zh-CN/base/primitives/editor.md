@@ -60,8 +60,22 @@ Editor::new(&editor)
 `gpui_kit::base::input` 导入相同的类型。
 
 `create_line_decorations_collection` 挂载一个 `LineDecorationProvider`，编辑器每一帧都会向它
-询问整行背景和行号槽标记。背景由 Base 直接绘制；标记只通过 `InputEditorStyle::gutter_marker_renderer`
+询问整行背景和行号槽标记。背景由 Base 直接绘制；标记只通过 `InputEditorStyle::gutter_marker_renderer()`
 绘制，样式化编辑器会提供该渲染器。参见[行装饰](../../component/editor.md#行装饰)。
+
+直接使用 Base 时，应用通过 builder 同时提供渲染器和布局尺寸：
+
+```rust
+let style = InputEditorStyle::default()
+    .with_gutter_marker_renderer(Some(renderer))
+    .with_gutter_marker_size(gpui_kit::rems(0.75))
+    .with_gutter_marker_gap(gpui_kit::rems(0.25));
+```
+
+标记尺寸和间距默认为零。渲染器应遵守配置的正方形尺寸；Base 使用同一尺寸计算槽宽和垂直居中。
+使用 rem 值时，每次布局都会按窗口当前的 rem 大小换算。
+通过 `gutter_marker_renderer()`、`gutter_marker_size()` 和 `gutter_marker_gap()` 读取配置，
+向 `with_gutter_marker_renderer` 传入 `None` 可停用标记。既有样式字段仍可直接读写。
 
 ## 高亮与语言功能
 

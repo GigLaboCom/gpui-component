@@ -309,7 +309,9 @@ added.dispose(cx); // 释放集合，使该句柄及其克隆全部失效。
 
 背景从行号槽一直延伸到右边缘，覆盖该行软换行后的全部显示行，位于当前行高亮、缩进参考线、
 选区和文字下方。标记绘制在行号左侧的独立槽位中，因此只在显示行号时出现。只要有集合设置了
-provider，行号槽就会保留该槽位，标记行滚入或滚出视图时宽度不变。`DiffAdded`、`DiffRemoved`、
+provider，行号槽就会保留该槽位，标记行滚入或滚出视图时宽度不变。
+样式化编辑器的标记尺寸为实际字号的 90%，间距为字号的 30%。图标、预留槽位和垂直居中使用同一尺寸，
+因此标记既跟随界面缩放，也跟随编辑器单独设置的 `.text_size(...)` 变化。`DiffAdded`、`DiffRemoved`、
 `DiffChanged`、`Conflict`、`Bookmark` 和 `Breakpoint` 使用主题的 success、danger、warning 和
 info 颜色；`GutterMarker::Custom { icon, color }` 按原样绘制给定的图标资源路径。两者都不影响
 命中测试或焦点，也不提供鼠标或键盘操作。

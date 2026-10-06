@@ -526,8 +526,11 @@ impl Input {
     }
 }
 
+const GUTTER_MARKER_FONT_SCALE: f32 = 0.9;
+const GUTTER_MARKER_GAP_FONT_SCALE: f32 = 0.3;
+
 /// The editor style projected from the theme.
-fn editor_style(cx: &App) -> gpui_base::input::InputEditorStyle {
+fn editor_style(font_size: gpui::Pixels, cx: &App) -> gpui_base::input::InputEditorStyle {
     let theme = cx.theme();
     let highlight = &theme.highlight_theme.style;
     let mut style = gpui_base::input::InputEditorStyle::default();
@@ -561,12 +564,18 @@ fn editor_style(cx: &App) -> gpui_base::input::InputEditorStyle {
             .selected(is_folded)
             .into_any_element()
     }));
-    style.gutter_marker_renderer = Some(gutter_marker_renderer(cx));
+    let marker_size = font_size * GUTTER_MARKER_FONT_SCALE;
     style
+        .with_gutter_marker_renderer(Some(gutter_marker_renderer(marker_size, cx)))
+        .with_gutter_marker_size(marker_size)
+        .with_gutter_marker_gap(font_size * GUTTER_MARKER_GAP_FONT_SCALE)
 }
 
 /// Renders each line decoration gutter marker as an icon in a theme color.
-fn gutter_marker_renderer(cx: &App) -> gpui_base::input::GutterMarkerRenderer {
+fn gutter_marker_renderer(
+    marker_size: gpui::Pixels,
+    cx: &App,
+) -> gpui_base::input::GutterMarkerRenderer {
     use gpui_base::input::GutterMarker;
 
     let theme = cx.theme();
@@ -582,8 +591,8 @@ fn gutter_marker_renderer(cx: &App) -> gpui_base::input::GutterMarkerRenderer {
             GutterMarker::Custom { icon, color } => (Icon::empty().path(icon.clone()), *color),
             _ => return gpui::Empty.into_any_element(),
         };
-        // 12px, the size the editor gives a marker.
-        icon.size_3().text_color(color).into_any_element()
+        // Match the size projected from the editor's effective font size.
+        icon.size(marker_size).text_color(color).into_any_element()
     })
 }
 
@@ -614,7 +623,6 @@ impl RenderOnce for Input {
         sync_focused_input_registry(&state, window, cx);
 
         state.ensure_highlighter_factory(crate::highlighter::input_highlighter_factory(), cx);
-        state.set_editor_style(editor_style(cx), cx);
         state.set_editor_paddings(
             if state.presentation(cx).is_multi_line() {
                 Edges {
@@ -818,6 +826,16 @@ impl RenderOnce for Input {
             .items_center()
             .gap(gap_x)
             .refine_style(&self.style)
+            .map(|mut this| {
+                let font_size = this
+                    .style()
+                    .text
+                    .font_size
+                    .unwrap_or_else(|| window.text_style().font_size)
+                    .to_pixels(window.rem_size());
+                state.set_editor_style(editor_style(font_size, cx), cx);
+                this
+            })
             .when(
                 focused && self.appearance && self.bordered && self.focus_bordered,
                 |this| this.focus_ring_style(window, cx),
