@@ -104,6 +104,12 @@ let editor = cx.new(|cx| {
 });
 ```
 
+纵向滚动条默认位于右侧。使用 `scrollbar_side` 可将其放到编辑器左边缘，覆盖在行号之上：
+
+```rust
+EditorState::new(window, cx).scrollbar_side(Side::Left)
+```
+
 ## 快捷键与矩形列选
 
 以下默认快捷键在编辑器聚焦时生效。macOS 的 Option 对应 Alt 修饰键；Linux 的这些操作不使用 Super/Win。

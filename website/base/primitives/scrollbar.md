@@ -33,7 +33,7 @@ use std::time::Duration;
 use gpui_kit::{div, px, rgb, ScrollHandle, Styled as _};
 use gpui_kit::base::{
     Scrollbar, ScrollbarAxis, ScrollbarEntrance, ScrollbarMode,
-    ScrollbarMotion, ScrollbarStyles, ScrollbarTheme, Theme,
+    ScrollbarMotion, ScrollbarStyles, ScrollbarTheme, Side, Theme,
 };
 ```
 
@@ -77,6 +77,14 @@ Scrollbar::vertical(&scroll_handle);
 Scrollbar::horizontal(&scroll_handle);
 
 Scrollbar::new(&scroll_handle).axis(ScrollbarAxis::Vertical);
+```
+
+The vertical scrollbar sits on the right edge by default. Use `side` to move it
+to the left edge, for example in the left pane of a side-by-side view. The
+horizontal scrollbar stays at the bottom and starts after the vertical one:
+
+```rust
+Scrollbar::new(&scroll_handle).side(Side::Left);
 ```
 
 The scrollbar is an absolute overlay. Its layout and hitboxes stay fixed while
@@ -182,7 +190,7 @@ The example theme above produces this choreography:
 | Thumb hover in `Hover` mode           | `thumb_hover_entrance`: slide from the nearest edge while fading |
 | `Always` mode                         | Immediate; visibility motion is skipped                          |
 
-For `SlideAndFade`, a vertical scrollbar enters from the right and a horizontal
+For `SlideAndFade`, a vertical scrollbar enters from its side and a horizontal
 scrollbar enters from the bottom. Opacity uses linear entrance progress;
 position uses cubic ease-out. Exit opacity and position use cubic ease-in.
 

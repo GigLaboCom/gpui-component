@@ -3,7 +3,7 @@ use std::{cell::Cell, ops::Deref, panic::Location, rc::Rc};
 use instant::{Duration, Instant};
 
 use crate::{
-    AxisExt,
+    AxisExt, Side,
     animation::{ease_in_cubic, ease_out_cubic},
     theme::ActiveTheme as _,
 };
@@ -474,10 +474,19 @@ impl VisibilityAnimation {
     }
 }
 
-fn visibility_translation(axis: Axis, track_width: Pixels, progress: f32) -> Point<Pixels> {
+fn visibility_translation(
+    axis: Axis,
+    side: Side,
+    track_width: Pixels,
+    progress: f32,
+) -> Point<Pixels> {
     let offset = track_width * (1.0 - progress.clamp(0.0, 1.0));
     if axis.is_vertical() {
-        point(offset, px(0.))
+        if side.is_left() {
+            point(-offset, px(0.))
+        } else {
+            point(offset, px(0.))
+        }
     } else {
         point(px(0.), offset)
     }
@@ -815,6 +824,7 @@ impl ScrollbarAxis {
 pub struct Scrollbar {
     pub(crate) id: ElementId,
     axis: ScrollbarAxis,
+    side: Side,
     mode: Option<ScrollbarMode>,
     scroll_handle: Rc<dyn ScrollbarHandle>,
     scroll_size: Option<Size<Pixels>>,
@@ -838,6 +848,7 @@ impl Scrollbar {
         Self {
             id: ElementId::CodeLocation(*caller),
             axis: ScrollbarAxis::Both,
+            side: Side::Right,
             mode: None,
             scroll_handle: Rc::new(scroll_handle.clone()),
             max_fps: 120,
@@ -918,6 +929,14 @@ impl Scrollbar {
     /// Set scrollbar axis.
     pub fn axis(mut self, axis: impl Into<ScrollbarAxis>) -> Self {
         self.axis = axis.into();
+        self
+    }
+
+    /// Set the side of the vertical scrollbar.
+    ///
+    /// Default is `Side::Right`. The horizontal scrollbar stays at the bottom.
+    pub fn side(mut self, side: Side) -> Self {
+        self.side = side;
         self
     }
 
@@ -1394,7 +1413,7 @@ impl Element for Scrollbar {
             };
 
             // The horizontal scrollbar is set avoid overlapping with the vertical scrollbar, if the vertical scrollbar is visible.
-            let margin_end = if has_both && !is_vertical {
+            let margin = if has_both && !is_vertical {
                 track_width
             } else {
                 px(0.)
@@ -1408,10 +1427,14 @@ impl Element for Scrollbar {
 
             let bounds = Bounds {
                 origin: if is_vertical {
-                    point(
-                        hitbox.origin.x + hitbox.size.width - track_width,
-                        hitbox.origin.y,
-                    )
+                    if self.side.is_left() {
+                        hitbox.origin
+                    } else {
+                        point(
+                            hitbox.origin.x + hitbox.size.width - track_width,
+                            hitbox.origin.y,
+                        )
+                    }
                 } else {
                     point(
                         hitbox.origin.x,
@@ -1481,20 +1504,25 @@ impl Element for Scrollbar {
             } else {
                 bounds.origin.x
             };
+            let track_origin = if !is_vertical && self.side.is_left() {
+                origin + margin
+            } else {
+                origin
+            };
             let geometry = ThumbGeometry::new(
-                origin,
+                track_origin,
                 container_size,
                 scroll_area_size,
-                margin_end,
+                margin,
                 inset,
                 min_length,
             );
             let (_, _, _, _, active_inset, _, active_min_length) = self.style_for_active(cx);
             let active_geometry = ThumbGeometry::new(
-                origin,
+                track_origin,
                 container_size,
                 scroll_area_size,
-                margin_end,
+                margin,
                 active_inset,
                 active_min_length,
             );
@@ -1502,7 +1530,13 @@ impl Element for Scrollbar {
 
             // The clickable area of the thumb
             let thumb_length = geometry.length;
-            let thumb_bounds = if is_vertical {
+            let thumb_bounds = if is_vertical && self.side.is_left() {
+                Bounds::from_anchor_and_size(
+                    Anchor::TopLeft,
+                    bounds.origin + point(inset, thumb_start),
+                    size(track_width, thumb_length),
+                )
+            } else if is_vertical {
                 Bounds::from_anchor_and_size(
                     Anchor::TopRight,
                     bounds.top_right() + point(-inset, thumb_start),
@@ -1517,7 +1551,13 @@ impl Element for Scrollbar {
             };
 
             // The actual render area of the thumb
-            let thumb_fill_bounds = if is_vertical {
+            let thumb_fill_bounds = if is_vertical && self.side.is_left() {
+                Bounds::from_anchor_and_size(
+                    Anchor::TopLeft,
+                    bounds.origin + point(inset, thumb_start),
+                    size(thumb_width, thumb_length),
+                )
+            } else if is_vertical {
                 Bounds::from_anchor_and_size(
                     Anchor::TopRight,
                     bounds.top_right() + point(-inset, thumb_start),
@@ -1597,8 +1637,12 @@ impl Element for Scrollbar {
                     let is_vertical = axis.is_vertical();
                     let visibility_opacity = state.visibility_opacity;
                     let is_visible = state.visibility_requested || visibility_opacity > 0.0;
-                    let translation =
-                        visibility_translation(axis, state.track_width, state.visibility_position);
+                    let translation = visibility_translation(
+                        axis,
+                        self.side,
+                        state.track_width,
+                        state.visibility_position,
+                    );
                     let painted_bounds = state.bounds + translation;
                     let painted_thumb_bounds = state.thumb_fill_bounds + translation;
                     let painted_track_bg = state.bg.opacity(visibility_opacity);
@@ -2002,7 +2046,7 @@ mod tests {
         assert_eq!(shown.position, 1.0);
         assert!(!shown.running, "a motionless theme must request no frames");
         assert_eq!(
-            visibility_translation(Axis::Vertical, px(16.), shown.position),
+            visibility_translation(Axis::Vertical, Side::Right, px(16.), shown.position),
             Point::default()
         );
 
@@ -2073,15 +2117,19 @@ mod tests {
     #[test]
     fn visibility_translation_moves_toward_the_nearest_edge() {
         assert_eq!(
-            visibility_translation(Axis::Vertical, px(16.), 0.0),
+            visibility_translation(Axis::Vertical, Side::Right, px(16.), 0.0),
             point(px(16.), px(0.))
         );
         assert_eq!(
-            visibility_translation(Axis::Horizontal, px(16.), 0.0),
+            visibility_translation(Axis::Vertical, Side::Left, px(16.), 0.0),
+            point(px(-16.), px(0.))
+        );
+        assert_eq!(
+            visibility_translation(Axis::Horizontal, Side::Left, px(16.), 0.0),
             point(px(0.), px(16.))
         );
         assert_eq!(
-            visibility_translation(Axis::Vertical, px(16.), 1.0),
+            visibility_translation(Axis::Vertical, Side::Right, px(16.), 1.0),
             Point::default()
         );
     }
@@ -2255,15 +2303,18 @@ mod tests {
     struct ScrollbarHarness {
         handle: TestHandle,
         axis: ScrollbarAxis,
+        side: Side,
         mode: ScrollbarMode,
     }
 
     impl Render for ScrollbarHarness {
         fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-            div()
-                .relative()
-                .size(px(100.))
-                .child(Scrollbar::new(&self.handle).axis(self.axis).mode(self.mode))
+            div().relative().size(px(100.)).child(
+                Scrollbar::new(&self.handle)
+                    .axis(self.axis)
+                    .side(self.side)
+                    .mode(self.mode),
+            )
         }
     }
 
@@ -2273,10 +2324,25 @@ mod tests {
         mode: ScrollbarMode,
         content_size: Size<Pixels>,
     ) -> (&mut VisualTestContext, TestHandle) {
+        harness_on_side(cx, axis, Side::Right, mode, content_size)
+    }
+
+    fn harness_on_side(
+        cx: &mut TestAppContext,
+        axis: ScrollbarAxis,
+        side: Side,
+        mode: ScrollbarMode,
+        content_size: Size<Pixels>,
+    ) -> (&mut VisualTestContext, TestHandle) {
         let handle = TestHandle::new(content_size);
         let (_, cx) = cx.add_window_view({
             let handle = handle.clone();
-            move |_, _| ScrollbarHarness { handle, axis, mode }
+            move |_, _| ScrollbarHarness {
+                handle,
+                axis,
+                side,
+                mode,
+            }
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
         (cx, handle)
@@ -2450,6 +2516,55 @@ mod tests {
     }
 
     #[gpui::test]
+    fn left_side_puts_the_vertical_track_and_thumb_on_the_left_edge(cx: &mut TestAppContext) {
+        let (cx, handle) = harness_on_side(
+            cx,
+            ScrollbarAxis::Vertical,
+            Side::Left,
+            ScrollbarMode::Always,
+            size(px(100.), px(500.)),
+        );
+        cx.simulate_click(point(px(95.), px(80.)), Modifiers::default());
+        assert_eq!(handle.offset(), Point::default());
+
+        cx.simulate_mouse_down(
+            point(px(14.), px(20.)),
+            MouseButton::Left,
+            Modifiers::default(),
+        );
+        assert_eq!(handle.drag_starts.get(), 1);
+        assert_eq!(handle.offset(), Point::default());
+        cx.simulate_mouse_up(
+            point(px(14.), px(20.)),
+            MouseButton::Left,
+            Modifiers::default(),
+        );
+
+        cx.simulate_click(point(px(5.), px(80.)), Modifiers::default());
+        assert!(handle.offset().y < px(0.));
+        assert_eq!(handle.offset().x, px(0.));
+    }
+
+    #[gpui::test]
+    fn left_side_starts_the_horizontal_track_after_the_vertical_one(cx: &mut TestAppContext) {
+        let (cx, handle) = harness_on_side(
+            cx,
+            ScrollbarAxis::Both,
+            Side::Left,
+            ScrollbarMode::Always,
+            size(px(500.), px(500.)),
+        );
+        // The 48 px thumb, inset by 4 px, covers 50 px only when the track
+        // begins after the 16 px vertical track.
+        cx.simulate_click(point(px(50.), px(95.)), Modifiers::default());
+        assert_eq!(handle.drag_starts.get(), 1);
+        assert_eq!(handle.offset(), Point::default());
+
+        cx.simulate_click(point(px(99.), px(95.)), Modifiers::default());
+        assert_eq!(handle.offset(), point(px(-400.), px(0.)));
+    }
+
+    #[gpui::test]
     fn horizontal_track_click_updates_horizontal_offset(cx: &mut TestAppContext) {
         let (cx, horizontal) = harness(
             cx,
@@ -2539,6 +2654,7 @@ mod tests {
             move |_, _| ScrollbarHarness {
                 handle,
                 axis: ScrollbarAxis::Vertical,
+                side: Side::Right,
                 mode: ScrollbarMode::Always,
             }
         });

@@ -34,6 +34,7 @@ use super::{
     mode::LayoutMode,
     undo_manager::{EditIntent, UndoManager},
 };
+use crate::Side;
 use crate::actions::{SelectDown, SelectLeft, SelectRight, SelectUp};
 use crate::input::blink_cursor::CURSOR_WIDTH;
 use crate::input::movement::MoveDirection;
@@ -430,6 +431,7 @@ pub struct InputBaseState<M: InputModeKind> {
     /// The size of the scrollable content.
     pub(crate) scroll_size: gpui::Size<Pixels>,
     pub(super) editor_scrollbar_snapshot: Cell<Option<EditorScrollbarSnapshot>>,
+    pub(super) scrollbar_side: Side,
     /// The unwrapped width of the longest line and what it was measured for.
     pub(super) longest_line_width: Cell<Option<(LongestLineKey, Pixels)>>,
     pub(super) editor_paddings: Edges<Pixels>,
@@ -765,6 +767,7 @@ impl<M: InputModeKind> InputBaseState<M> {
             scroll_handle: ScrollHandle::new(),
             scroll_size: gpui::size(px(0.), px(0.)),
             editor_scrollbar_snapshot: Cell::new(None),
+            scrollbar_side: Side::Right,
             longest_line_width: Cell::new(None),
             editor_paddings: Edges::default(),
             deferred_scroll_offset: None,
@@ -10664,6 +10667,21 @@ impl<M: crate::input::MultiLineMode> InputBaseState<M> {
     /// See [`InputBaseState::searchable`].
     pub fn set_searchable(&mut self, searchable: bool, cx: &mut Context<Self>) {
         self.searchable = searchable;
+        cx.notify();
+    }
+
+    /// The side of the vertical scrollbar, default is [`Side::Right`].
+    ///
+    /// On the left, the scrollbar sits on the input's left edge, over the
+    /// line numbers. The horizontal scrollbar stays at the bottom.
+    pub fn scrollbar_side(mut self, side: Side) -> Self {
+        self.scrollbar_side = side;
+        self
+    }
+
+    /// See [`InputBaseState::scrollbar_side`].
+    pub fn set_scrollbar_side(&mut self, side: Side, cx: &mut Context<Self>) {
+        self.scrollbar_side = side;
         cx.notify();
     }
 

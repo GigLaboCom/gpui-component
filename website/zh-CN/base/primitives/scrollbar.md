@@ -18,7 +18,7 @@ cargo run -p gpui-base-examples -- scrollbar
 
 ## 基本用法
 
-把 `ScrollHandle` 保存在持久视图状态中，通过 `track_scroll` 连接可滚动内容，并在同一个 `relative()` 容器中叠加 `Scrollbar`。`Scrollbar::new` 启用双轴；单轴使用 `vertical`、`horizontal` 或 `.axis(...)`。滚动条是绝对定位覆盖层，进入动画不会移动内容或命中区域。
+把 `ScrollHandle` 保存在持久视图状态中，通过 `track_scroll` 连接可滚动内容，并在同一个 `relative()` 容器中叠加 `Scrollbar`。`Scrollbar::new` 启用双轴；单轴使用 `vertical`、`horizontal` 或 `.axis(...)`。纵向滚动条默认位于右侧，`.side(Side::Left)` 可将其放到左侧，例如并排视图的左侧窗格；横向滚动条仍在底部，并从纵向滚动条之后开始。滚动条是绝对定位覆盖层，进入动画不会移动内容或命中区域。
 
 ## 可见模式
 
@@ -34,7 +34,7 @@ cargo run -p gpui-base-examples -- scrollbar
 
 ## 动画行为
 
-Base 不附带产品动画。默认仅有 2 秒行为性空闲等待，进入、退出和展开时长均为零。`Fade` 原地淡入；`SlideAndFade` 让纵向滚动条从右侧、横向滚动条从底部进入。被中断的过渡从当前视觉值反向；零时长立即采用目标值。GPUI 的减少动态效果偏好也会把可见性和宽度时长降为零。
+Base 不附带产品动画。默认仅有 2 秒行为性空闲等待，进入、退出和展开时长均为零。`Fade` 原地淡入；`SlideAndFade` 让纵向滚动条从其所在一侧、横向滚动条从底部进入。被中断的过渡从当前视觉值反向；零时长立即采用目标值。GPUI 的减少动态效果偏好也会把可见性和宽度时长降为零。
 
 ## 自定义视口与句柄
 

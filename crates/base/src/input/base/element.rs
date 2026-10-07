@@ -16,7 +16,7 @@ use smallvec::SmallVec;
 use std::{ops::Range, rc::Rc};
 
 use crate::{
-    Scrollbar,
+    Scrollbar, Side,
     input::{RopeExt as _, blink_cursor::CURSOR_WIDTH, display_map::LineLayout},
 };
 
@@ -138,6 +138,7 @@ pub(super) struct EditorScrollbarSnapshot {
     layout: EditorScrollbarLayout,
     cursor_scroll_offset: Point<Pixels>,
     soft_wrap: bool,
+    side: Side,
 }
 
 impl EditorScrollbarSnapshot {
@@ -154,9 +155,11 @@ impl EditorScrollbarSnapshot {
                 last_layout.line_number_width,
                 scroll_size,
                 state.editor_paddings,
+                state.scrollbar_side,
             ),
             cursor_scroll_offset,
             soft_wrap: state.soft_wrap,
+            side: state.scrollbar_side,
         }
     }
 }
@@ -167,8 +170,11 @@ impl EditorScrollbarLayout {
         line_number_width: Pixels,
         scroll_size: Size<Pixels>,
         paddings: Edges<Pixels>,
+        side: Side,
     ) -> Self {
-        let left = if line_number_width == px(0.) {
+        let left = if side.is_left() {
+            -paddings.left
+        } else if line_number_width == px(0.) {
             px(0.)
         } else {
             paddings.left + line_number_width - LINE_NUMBER_RIGHT_MARGIN
@@ -262,6 +268,7 @@ impl<M: InputModeKind> Element for EditorScrollbar<M> {
         } else {
             Scrollbar::vertical(&scroll_handle)
         }
+        .side(snapshot.side)
         .viewport_bounds(snapshot.layout.bounds)
         .scroll_size(snapshot.layout.scroll_size)
         .into_any_element();
@@ -4811,8 +4818,13 @@ mod tests {
             left: px(7.),
         };
 
-        let layout =
-            EditorScrollbarLayout::new(input_bounds, px(40.), size(px(1000.), px(200.)), paddings);
+        let layout = EditorScrollbarLayout::new(
+            input_bounds,
+            px(40.),
+            size(px(1000.), px(200.)),
+            paddings,
+            Side::Right,
+        );
 
         assert_eq!(
             layout.bounds,
@@ -4820,14 +4832,44 @@ mod tests {
         );
         assert_eq!(layout.scroll_size, size(px(972.), px(200.)));
 
-        let layout_without_gutter =
-            EditorScrollbarLayout::new(input_bounds, px(0.), size(px(500.), px(120.)), paddings);
+        let layout_without_gutter = EditorScrollbarLayout::new(
+            input_bounds,
+            px(0.),
+            size(px(500.), px(120.)),
+            paddings,
+            Side::Right,
+        );
 
         assert_eq!(
             layout_without_gutter.bounds,
             Bounds::new(point(px(10.), px(18.)), size(px(303.), px(87.)))
         );
         assert_eq!(layout_without_gutter.scroll_size, size(px(513.), px(120.)));
+    }
+
+    #[test]
+    fn test_editor_scrollbar_layout_on_the_left_covers_the_gutter() {
+        let input_bounds = Bounds::new(point(px(10.), px(20.)), size(px(300.), px(80.)));
+        let paddings = Edges {
+            top: px(2.),
+            right: px(3.),
+            bottom: px(5.),
+            left: px(7.),
+        };
+
+        let layout = EditorScrollbarLayout::new(
+            input_bounds,
+            px(40.),
+            size(px(1000.), px(200.)),
+            paddings,
+            Side::Left,
+        );
+
+        assert_eq!(
+            layout.bounds,
+            Bounds::new(point(px(3.), px(18.)), size(px(310.), px(87.)))
+        );
+        assert_eq!(layout.scroll_size, size(px(1020.), px(200.)));
     }
 
     #[test]

@@ -118,6 +118,13 @@ let editor = cx.new(|cx| {
 });
 ```
 
+The vertical scrollbar sits on the right edge by default. Use `scrollbar_side`
+to put it on the editor's left edge, over the line numbers:
+
+```rust
+EditorState::new(window, cx).scrollbar_side(Side::Left)
+```
+
 ## Keyboard shortcuts and column selection
 
 These defaults apply while the editor is focused. On macOS, Option is the Alt
