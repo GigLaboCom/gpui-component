@@ -432,6 +432,7 @@ pub struct InputBaseState<M: InputModeKind> {
     pub(crate) scroll_size: gpui::Size<Pixels>,
     pub(super) editor_scrollbar_snapshot: Cell<Option<EditorScrollbarSnapshot>>,
     pub(super) scrollbar_side: Side,
+    pub(super) gutter_side: Side,
     /// The unwrapped width of the longest line and what it was measured for.
     pub(super) longest_line_width: Cell<Option<(LongestLineKey, Pixels)>>,
     pub(super) editor_paddings: Edges<Pixels>,
@@ -768,6 +769,7 @@ impl<M: InputModeKind> InputBaseState<M> {
             scroll_size: gpui::size(px(0.), px(0.)),
             editor_scrollbar_snapshot: Cell::new(None),
             scrollbar_side: Side::Right,
+            gutter_side: Side::Left,
             longest_line_width: Cell::new(None),
             editor_paddings: Edges::default(),
             deferred_scroll_offset: None,
@@ -931,7 +933,7 @@ impl<M: InputModeKind> InputBaseState<M> {
             let local_offset = offset.saturating_sub(prev_lines_offset);
             if let Some(pos) = line.position_for_index(local_offset, last_layout, false) {
                 let sub_line_index = (pos.y / line_height) as usize;
-                let adjusted_pos = point(pos.x + last_layout.line_number_width, pos.y + y_offset);
+                let adjusted_pos = point(pos.x + last_layout.text_origin_x, pos.y + y_offset);
                 return (vi, sub_line_index, Some(adjusted_pos));
             }
 
@@ -3083,7 +3085,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         };
 
         let line_height = last_layout.line_height;
-        let line_number_width = last_layout.line_number_width;
+        let text_origin_x = last_layout.text_origin_x;
 
         // TIP: About the IBeam cursor
         //
@@ -3095,7 +3097,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         //
         // - included the input padding.
         // - included the scroll offset.
-        let inner_position = position - bounds.origin - point(line_number_width, px(0.));
+        let inner_position = position - bounds.origin - point(text_origin_x, px(0.));
 
         let mut y_offset = last_layout.visible_top;
         // Position relative to the last line walked, kept for a pointer that ends up
@@ -4372,12 +4374,11 @@ impl<M: InputModeKind> EntityInputHandler for InputBaseState<M> {
     ) -> Option<Bounds<Pixels>> {
         let last_layout = self.last_layout.as_ref()?;
         let line_height = last_layout.line_height;
-        let line_number_width = last_layout.line_number_width;
         let range = self.range_from_utf16(&range_utf16);
 
         let mut start_origin = None;
         let mut end_origin = None;
-        let line_number_origin = point(line_number_width, px(0.));
+        let text_origin = point(last_layout.text_origin_x, px(0.));
         let mut y_offset = last_layout.visible_top;
 
         for (vi, line) in last_layout.lines.iter().enumerate() {
@@ -4413,16 +4414,16 @@ impl<M: InputModeKind> EntityInputHandler for InputBaseState<M> {
         let start_origin = start_origin.or_else(|| {
             let offset = self.last_cursor.or(Some(self.cursor()))?;
             let (_, _, origin) = self.line_and_position_for_offset(offset);
-            origin.map(|origin| origin - line_number_origin)
+            origin.map(|origin| origin - text_origin)
         })?;
         let mut end_origin = end_origin.unwrap_or(start_origin);
         // Ensure at same line.
         end_origin.y = start_origin.y;
 
         Some(Bounds::from_corners(
-            bounds.origin + line_number_origin + start_origin,
+            bounds.origin + text_origin + start_origin,
             // + line_height for show IME panel under the cursor line.
-            bounds.origin + line_number_origin + point(end_origin.x, end_origin.y + line_height),
+            bounds.origin + text_origin + point(end_origin.x, end_origin.y + line_height),
         ))
     }
 
@@ -10682,6 +10683,23 @@ impl<M: crate::input::MultiLineMode> InputBaseState<M> {
     /// See [`InputBaseState::scrollbar_side`].
     pub fn set_scrollbar_side(&mut self, side: Side, cx: &mut Context<Self>) {
         self.scrollbar_side = side;
+        cx.notify();
+    }
+
+    /// The side of the gutter with the line numbers and fold icons, default is
+    /// [`Side::Left`].
+    ///
+    /// On the right, the gutter is mirrored: the fold icons sit next to the
+    /// text, the line numbers are aligned toward it and the gutter markers keep
+    /// to the outer edge. A vertical scrollbar on the same side stays outermost.
+    pub fn gutter_side(mut self, side: Side) -> Self {
+        self.gutter_side = side;
+        self
+    }
+
+    /// See [`InputBaseState::gutter_side`].
+    pub fn set_gutter_side(&mut self, side: Side, cx: &mut Context<Self>) {
+        self.gutter_side = side;
         cx.notify();
     }
 
