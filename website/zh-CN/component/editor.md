@@ -104,7 +104,7 @@ let editor = cx.new(|cx| {
 });
 ```
 
-纵向滚动条默认位于右侧。使用 `scrollbar_side` 可将其放到编辑器左边缘，覆盖在行号之上：
+纵向滚动条默认位于右侧。使用 `scrollbar_side` 可将其放到编辑器左边缘，覆盖在行号之上；若 gutter 位于右侧，文本会与滚动条保持间距：
 
 ```rust
 EditorState::new(window, cx).scrollbar_side(Side::Left)

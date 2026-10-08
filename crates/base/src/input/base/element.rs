@@ -584,7 +584,6 @@ impl<M: InputModeKind> TextElement<M> {
         let line_height = last_layout.line_height;
         let visible_range = &last_layout.visible_range;
         let lines = &last_layout.lines;
-        let line_number_width = last_layout.line_number_width;
 
         let active_id = state.active_selection().id;
         let mut scroll_offset = state.scroll_handle.offset();
@@ -672,10 +671,10 @@ impl<M: InputModeKind> TextElement<M> {
                     };
 
                     scroll_offset.x = if scroll_offset.x + cursor_pos.x
-                        > (bounds.size.width - line_number_width - safety_margin)
+                        > (last_layout.text_width - safety_margin)
                     {
                         // cursor is out of right
-                        bounds.size.width - line_number_width - safety_margin - cursor_pos.x
+                        last_layout.text_width - safety_margin - cursor_pos.x
                     } else if scroll_offset.x + cursor_pos.x < px(0.) {
                         // cursor is out of left
                         -cursor_pos.x
@@ -2714,9 +2713,23 @@ impl<M: InputModeKind> Element for TextElement<M> {
         let (line_number_width, line_number_len) =
             Self::layout_line_numbers(&state, &text, text_size, &text_style, window);
 
+        let gutter_side = state.gutter_side;
+        let (mut text_origin_x, gutter_origin_x) = if gutter_side.is_left() {
+            (line_number_width, px(0.))
+        } else {
+            (px(0.), bounds.size.width - line_number_width)
+        };
+        // A scrollbar on the left keeps the same margin from the text as one on the right.
+        let mut reserved_width = line_number_width;
+        if state.scrollbar_side.is_left() && text_origin_x < RIGHT_MARGIN {
+            reserved_width += RIGHT_MARGIN - text_origin_x;
+            text_origin_x = RIGHT_MARGIN;
+        }
+        let text_width = bounds.size.width - reserved_width;
+
         let mut bounds = bounds;
         let wrap_width = if multi_line && state.soft_wrap {
-            Some(bounds.size.width - line_number_width - RIGHT_MARGIN)
+            Some(text_width - RIGHT_MARGIN)
         } else {
             None
         };
@@ -2743,7 +2756,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
 
         let line_height = window.line_height();
         let token_elements = self.measure_tokens(
-            (bounds.size.width - line_number_width - RIGHT_MARGIN).max(px(1.)),
+            (text_width - RIGHT_MARGIN).max(px(1.)),
             line_height,
             bounds.size.height,
             window,
@@ -2789,12 +2802,6 @@ impl<M: InputModeKind> Element for TextElement<M> {
             )
         };
 
-        let gutter_side = state.gutter_side;
-        let (text_origin_x, gutter_origin_x) = if gutter_side.is_left() {
-            (line_number_width, px(0.))
-        } else {
-            (px(0.), bounds.size.width - line_number_width)
-        };
         let mut last_layout = LastLayout {
             visible_range,
             visible_buffer_lines,
@@ -2810,6 +2817,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             gutter_side,
             text_origin_x,
             gutter_origin_x,
+            text_width,
             space_width,
             lines: Rc::new(vec![]),
             cursor_bounds: None,
@@ -2968,8 +2976,8 @@ impl<M: InputModeKind> Element for TextElement<M> {
         // last content row, so take the max rather than summing — summing
         // left a band of empty space the cursor could never reach.
         let mut scroll_size = size(
-            if longest_line_width + line_number_width + RIGHT_MARGIN > bounds.size.width {
-                longest_line_width + line_number_width + RIGHT_MARGIN
+            if longest_line_width + reserved_width + RIGHT_MARGIN > bounds.size.width {
+                longest_line_width + reserved_width + RIGHT_MARGIN
             } else {
                 longest_line_width
             },
@@ -2981,7 +2989,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
         // TODO: should be add some gap to right, to convenient to focus on boundary position
         if last_layout.text_align == TextAlign::Right || last_layout.text_align == TextAlign::Center
         {
-            scroll_size.width = longest_line_width + line_number_width;
+            scroll_size.width = longest_line_width + reserved_width;
         }
 
         // `position_for_index` for example
@@ -3373,13 +3381,8 @@ impl<M: InputModeKind> Element for TextElement<M> {
                     let ghost_p = point(ghost_x, origin.y + offset_y);
 
                     // Paint semi-transparent background for ghost line
-                    let ghost_bounds = Bounds::new(
-                        ghost_p,
-                        size(
-                            bounds.size.width - prepaint.last_layout.line_number_width,
-                            line_height,
-                        ),
-                    );
+                    let ghost_bounds =
+                        Bounds::new(ghost_p, size(prepaint.last_layout.text_width, line_height));
                     window.paint_quad(fill(ghost_bounds, editor_background));
 
                     // Paint ghost line text
@@ -4604,6 +4607,44 @@ mod tests {
                     "{gutter:?} gutter, {scrollbar:?} scrollbar"
                 );
             }
+        });
+    }
+
+    #[gpui::test]
+    fn the_text_keeps_clear_of_a_scrollbar_on_the_left(cx: &mut TestAppContext) {
+        let (editor, window) = decoration_editor(cx, &"word ".repeat(40), true);
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        cx.update(|window, cx| {
+            editor.update(cx, |state, cx| {
+                state.set_editor_paddings(Edges {
+                    top: px(4.),
+                    right: px(10.),
+                    bottom: px(4.),
+                    left: px(6.),
+                });
+                state.set_gutter_side(Side::Right, cx);
+                state.set_scrollbar_side(Side::Left, cx);
+            });
+            window.draw(cx).clear(cx);
+            let state = editor.read(cx);
+            let layout = state.last_layout.as_ref().unwrap();
+            let input_bounds = state.input_bounds;
+            let scrollbar = state.editor_scrollbar_snapshot.get().unwrap().layout.bounds;
+
+            assert!(
+                input_bounds.left() + layout.text_origin_x >= scrollbar.left() + Scrollbar::width(),
+                "the text starts under the scrollbar"
+            );
+            // The text gives the room up, the gutter does not move.
+            assert_eq!(
+                layout.gutter_origin_x,
+                input_bounds.size.width - layout.line_number_width
+            );
+            assert_eq!(
+                layout.text_origin_x + layout.text_width,
+                layout.gutter_origin_x
+            );
+            assert_eq!(layout.wrap_width, Some(layout.text_width - RIGHT_MARGIN));
         });
     }
 

@@ -119,7 +119,8 @@ let editor = cx.new(|cx| {
 ```
 
 The vertical scrollbar sits on the right edge by default. Use `scrollbar_side`
-to put it on the editor's left edge, over the line numbers:
+to put it on the editor's left edge, over the line numbers, or clear of the
+text when the gutter is on the right:
 
 ```rust
 EditorState::new(window, cx).scrollbar_side(Side::Left)

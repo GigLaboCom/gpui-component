@@ -2583,7 +2583,7 @@ impl<M: InputModeKind> InputBaseState<M> {
             let line = &last_layout.lines[vi];
             let local_offset = offset.saturating_sub(last_layout.visible_line_byte_offsets[vi]);
             if let Some(pos) = line.position_for_index(local_offset, last_layout, false) {
-                let bounds_width = bounds.size.width - last_layout.line_number_width;
+                let bounds_width = last_layout.text_width;
                 let col_offset_x = pos.x;
                 if col_offset_x - safety_margin < -scroll_offset.x {
                     // If the position is out of the visible area, scroll to make it visible
@@ -10674,7 +10674,8 @@ impl<M: crate::input::MultiLineMode> InputBaseState<M> {
     /// The side of the vertical scrollbar, default is [`Side::Right`].
     ///
     /// On the left, the scrollbar sits on the input's left edge, over the
-    /// line numbers. The horizontal scrollbar stays at the bottom.
+    /// gutter when that is on the left too; otherwise the text keeps clear of
+    /// it. The horizontal scrollbar stays at the bottom.
     pub fn scrollbar_side(mut self, side: Side) -> Self {
         self.scrollbar_side = side;
         self
