@@ -130,9 +130,10 @@ EditorState::new(window, cx).scrollbar_placement(ScrollbarPlacement::BottomLeft)
 ```
 
 The gutter with the line numbers and fold icons sits on the left by default.
-Use `gutter_side` to put it on the right, mirrored, with the fold icons next to
-the text. Together with a scrollbar on the left, this lays out the left pane of
-a side-by-side diff:
+In a side-by-side diff, both gutters can face the center, so the line numbers
+of corresponding lines sit next to each other across the divider. The left pane
+puts its gutter on its right with `gutter_side` — mirrored, the fold icons next
+to the text — and its scrollbar on its outer edge:
 
 ```rust
 EditorState::new(window, cx)
@@ -142,11 +143,14 @@ EditorState::new(window, cx)
 
 On either side, the fold icons sit next to the text, then the line numbers,
 then the gutter markers. Use `gutter_order` to list the columns from the text
-outward; a column left out follows the listed ones:
+outward; a column left out follows the listed ones. In a diff, this puts the
+change markers between the text and the line numbers:
 
 ```rust
 EditorState::new(window, cx).gutter_order([GutterColumn::FoldIcons, GutterColumn::Markers])
 ```
+
+The Editor Diff story shows both layouts, with the two panes scrolling together.
 
 ## Keyboard shortcuts and column selection
 

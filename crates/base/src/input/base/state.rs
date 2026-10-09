@@ -10704,7 +10704,9 @@ impl<M: crate::input::MultiLineMode> InputBaseState<M> {
     /// The side of the gutter with the line numbers and fold icons, default is
     /// [`Side::Left`].
     ///
-    /// On the right, the gutter is mirrored: its columns keep their order
+    /// [`Side::Right`] is for the left pane of a side-by-side diff, so that both
+    /// gutters face the center and corresponding line numbers sit next to each
+    /// other. On the right, the gutter is mirrored: its columns keep their order
     /// from the text outward, see [`InputBaseState::gutter_order`], and the
     /// line numbers are aligned toward the text. A vertical scrollbar on the
     /// same side stays outermost.

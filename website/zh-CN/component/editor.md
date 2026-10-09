@@ -110,7 +110,7 @@ let editor = cx.new(|cx| {
 EditorState::new(window, cx).scrollbar_placement(ScrollbarPlacement::BottomLeft)
 ```
 
-行号和折叠图标所在的 gutter 默认位于左侧。使用 `gutter_side` 可将其放到右侧，并镜像排列，折叠图标紧邻文本。再把滚动条放到左侧，就是并排 diff 中左侧窗格的布局：
+行号和折叠图标所在的 gutter 默认位于左侧。在并排 diff 中，两侧的 gutter 可以朝向中间，使对应行的行号隔着分隔线相邻。左侧窗格用 `gutter_side` 将 gutter 放到右侧（镜像排列，折叠图标紧邻文本），并把滚动条放到外侧边缘：
 
 ```rust
 EditorState::new(window, cx)
@@ -118,11 +118,13 @@ EditorState::new(window, cx)
     .gutter_side(Side::Right)
 ```
 
-无论 gutter 位于哪一侧，折叠图标默认紧邻文本，向外依次是行号和 gutter 标记。使用 `gutter_order` 可按从文本向外的顺序列出各列，未列出的列依次排在其后：
+无论 gutter 位于哪一侧，折叠图标默认紧邻文本，向外依次是行号和 gutter 标记。使用 `gutter_order` 可按从文本向外的顺序列出各列，未列出的列依次排在其后。在 diff 中，这样可以把变更标记放在文本与行号之间：
 
 ```rust
 EditorState::new(window, cx).gutter_order([GutterColumn::FoldIcons, GutterColumn::Markers])
 ```
+
+Editor Diff 示例展示了这两种布局，两个窗格同步滚动。
 
 ## 快捷键与矩形列选
 
