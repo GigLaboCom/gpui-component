@@ -18,7 +18,24 @@ cargo run -p gpui-base-examples -- scrollbar
 
 ## 基本用法
 
-把 `ScrollHandle` 保存在持久视图状态中，通过 `track_scroll` 连接可滚动内容，并在同一个 `relative()` 容器中叠加 `Scrollbar`。`Scrollbar::new` 启用双轴；单轴使用 `vertical`、`horizontal` 或 `.axis(...)`。纵向滚动条默认位于右侧，`.side(Side::Left)` 可将其放到左侧，例如并排视图的左侧窗格；横向滚动条仍在底部，并从纵向滚动条之后开始。滚动条是绝对定位覆盖层，进入动画不会移动内容或命中区域。
+把 `ScrollHandle` 保存在持久视图状态中，通过 `track_scroll` 连接可滚动内容，并在同一个 `relative()` 容器中叠加 `Scrollbar`。`Scrollbar::new` 启用双轴；单轴使用 `vertical`、`horizontal` 或 `.axis(...)`。滚动条是绝对定位覆盖层，进入动画不会移动内容或命中区域。
+
+## 位置
+
+使用 `placement` 选择滚动条所在的边缘，例如在并排视图的左侧窗格中把纵向滚动条放到左边：
+
+```rust
+Scrollbar::new(&scroll_handle).placement(ScrollbarPlacement::BottomLeft);
+```
+
+| 位置                   | 纵向滚动条 | 横向滚动条 |
+| ---------------------- | ---------- | ---------- |
+| `BottomRight`（默认）  | 右侧       | 底部       |
+| `BottomLeft`           | 左侧       | 底部       |
+| `TopRight`             | 右侧       | 顶部       |
+| `TopLeft`              | 左侧       | 顶部       |
+
+单轴滚动条只使用位置中对应其轴向的部分。两个滚动条同时显示时，纵向轨道保持完整高度，横向轨道在纵向滚动条一侧让出其宽度。
 
 ## 可见模式
 
@@ -34,7 +51,7 @@ cargo run -p gpui-base-examples -- scrollbar
 
 ## 动画行为
 
-Base 不附带产品动画。默认仅有 2 秒行为性空闲等待，进入、退出和展开时长均为零。`Fade` 原地淡入；`SlideAndFade` 让纵向滚动条从其所在一侧、横向滚动条从底部进入。被中断的过渡从当前视觉值反向；零时长立即采用目标值。GPUI 的减少动态效果偏好也会把可见性和宽度时长降为零。
+Base 不附带产品动画。默认仅有 2 秒行为性空闲等待，进入、退出和展开时长均为零。`Fade` 原地淡入；`SlideAndFade` 让滚动条从其所在的边缘进入：纵向滚动条从左侧或右侧，横向滚动条从顶部或底部。被中断的过渡从当前视觉值反向；零时长立即采用目标值。GPUI 的减少动态效果偏好也会把可见性和宽度时长降为零。
 
 ## 自定义视口与句柄
 

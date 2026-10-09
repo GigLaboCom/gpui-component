@@ -1,6 +1,11 @@
 use std::rc::Rc;
 
-use gpui_kit::component::{ActiveTheme as _, button::Button, scroll::ScrollableElement, v_flex};
+use gpui_kit::component::{
+    ActiveTheme as _,
+    button::Button,
+    scroll::{ScrollableElement, Scrollbar, ScrollbarPlacement},
+    v_flex,
+};
 use gpui_kit::*;
 use serde::Deserialize;
 
@@ -17,9 +22,16 @@ pub struct ScrollbarStory {
     test_width: Pixels,
     size_mode: usize,
     scroll_handle: UniformListScrollHandle,
+    placement_scroll_handles: [ScrollHandle; 4],
 }
 
 const ITEM_HEIGHT: Pixels = px(50.);
+const PLACEMENTS: [ScrollbarPlacement; 4] = [
+    ScrollbarPlacement::TopLeft,
+    ScrollbarPlacement::TopRight,
+    ScrollbarPlacement::BottomLeft,
+    ScrollbarPlacement::BottomRight,
+];
 
 impl ScrollbarStory {
     fn new(_: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -37,6 +49,7 @@ impl ScrollbarStory {
             test_width,
             size_mode: 0,
             scroll_handle: UniformListScrollHandle::new(),
+            placement_scroll_handles: std::array::from_fn(|_| ScrollHandle::new()),
         }
     }
 
@@ -67,6 +80,48 @@ impl ScrollbarStory {
             .collect::<Vec<_>>()
             .into();
         cx.notify();
+    }
+
+    fn render_placement(&self, ix: usize, cx: &App) -> impl IntoElement {
+        let placement = PLACEMENTS[ix];
+        let scroll_handle = &self.placement_scroll_handles[ix];
+
+        v_flex()
+            .gap_1()
+            .child(
+                div()
+                    .text_sm()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(format!("{:?}", placement)),
+            )
+            .child(
+                div()
+                    .id(("placement", ix))
+                    .relative()
+                    .h(px(160.))
+                    .border_1()
+                    .border_color(cx.theme().border)
+                    .overflow_scroll()
+                    .track_scroll(scroll_handle)
+                    .child(
+                        v_flex()
+                            .w(px(900.))
+                            .p_3()
+                            .gap_2()
+                            .text_sm()
+                            .children((1..=20).map(|row| {
+                                div()
+                                    .p_2()
+                                    .bg(cx.theme().secondary)
+                                    .child(format!("Row {}", row))
+                            })),
+                    )
+                    .child(
+                        Scrollbar::new(scroll_handle)
+                            .id(("placement-scrollbar", ix))
+                            .placement(placement),
+                    ),
+            )
     }
 }
 
@@ -123,6 +178,13 @@ impl Render for ScrollbarStory {
                     }
                 },
             ))
+            .child(
+                div()
+                    .grid()
+                    .grid_cols(2)
+                    .gap_4()
+                    .children((0..PLACEMENTS.len()).map(|ix| self.render_placement(ix, cx))),
+            )
             .child({
                 div()
                     .relative()

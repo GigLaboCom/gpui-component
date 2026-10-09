@@ -16,7 +16,7 @@ use smallvec::SmallVec;
 use std::{ops::Range, rc::Rc};
 
 use crate::{
-    Scrollbar, Side,
+    Scrollbar, ScrollbarPlacement,
     input::{RopeExt as _, blink_cursor::CURSOR_WIDTH, display_map::LineLayout},
 };
 
@@ -138,7 +138,7 @@ pub(super) struct EditorScrollbarSnapshot {
     layout: EditorScrollbarLayout,
     cursor_scroll_offset: Point<Pixels>,
     soft_wrap: bool,
-    side: Side,
+    placement: ScrollbarPlacement,
 }
 
 impl EditorScrollbarSnapshot {
@@ -155,11 +155,11 @@ impl EditorScrollbarSnapshot {
                 last_layout.line_number_width,
                 scroll_size,
                 state.editor_paddings,
-                state.scrollbar_side,
+                state.scrollbar_placement,
             ),
             cursor_scroll_offset,
             soft_wrap: state.soft_wrap,
-            side: state.scrollbar_side,
+            placement: state.scrollbar_placement,
         }
     }
 }
@@ -170,9 +170,9 @@ impl EditorScrollbarLayout {
         line_number_width: Pixels,
         scroll_size: Size<Pixels>,
         paddings: Edges<Pixels>,
-        side: Side,
+        placement: ScrollbarPlacement,
     ) -> Self {
-        let left = if side.is_left() {
+        let left = if placement.is_left() {
             -paddings.left
         } else if line_number_width == px(0.) {
             px(0.)
@@ -268,7 +268,7 @@ impl<M: InputModeKind> Element for EditorScrollbar<M> {
         } else {
             Scrollbar::vertical(&scroll_handle)
         }
-        .side(snapshot.side)
+        .placement(snapshot.placement)
         .viewport_bounds(snapshot.layout.bounds)
         .scroll_size(snapshot.layout.scroll_size)
         .into_any_element();
@@ -4823,7 +4823,7 @@ mod tests {
             px(40.),
             size(px(1000.), px(200.)),
             paddings,
-            Side::Right,
+            ScrollbarPlacement::BottomRight,
         );
 
         assert_eq!(
@@ -4837,7 +4837,7 @@ mod tests {
             px(0.),
             size(px(500.), px(120.)),
             paddings,
-            Side::Right,
+            ScrollbarPlacement::BottomRight,
         );
 
         assert_eq!(
@@ -4862,7 +4862,7 @@ mod tests {
             px(40.),
             size(px(1000.), px(200.)),
             paddings,
-            Side::Left,
+            ScrollbarPlacement::BottomLeft,
         );
 
         assert_eq!(
@@ -4870,6 +4870,16 @@ mod tests {
             Bounds::new(point(px(3.), px(18.)), size(px(310.), px(87.)))
         );
         assert_eq!(layout.scroll_size, size(px(1020.), px(200.)));
+        assert_eq!(
+            EditorScrollbarLayout::new(
+                input_bounds,
+                px(40.),
+                size(px(1000.), px(200.)),
+                paddings,
+                ScrollbarPlacement::TopLeft,
+            ),
+            layout
+        );
     }
 
     #[test]

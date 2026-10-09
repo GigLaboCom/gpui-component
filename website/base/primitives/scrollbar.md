@@ -33,7 +33,7 @@ use std::time::Duration;
 use gpui_kit::{div, px, rgb, ScrollHandle, Styled as _};
 use gpui_kit::base::{
     Scrollbar, ScrollbarAxis, ScrollbarEntrance, ScrollbarMode,
-    ScrollbarMotion, ScrollbarStyles, ScrollbarTheme, Side, Theme,
+    ScrollbarMotion, ScrollbarPlacement, ScrollbarStyles, ScrollbarTheme, Theme,
 };
 ```
 
@@ -79,13 +79,23 @@ Scrollbar::horizontal(&scroll_handle);
 Scrollbar::new(&scroll_handle).axis(ScrollbarAxis::Vertical);
 ```
 
-The vertical scrollbar sits on the right edge by default. Use `side` to move it
-to the left edge, for example in the left pane of a side-by-side view. The
-horizontal scrollbar stays at the bottom and starts after the vertical one:
+Use `placement` to choose the edges the scrollbars sit on, for example to put
+the vertical scrollbar on the left edge of the left pane in a side-by-side view:
 
 ```rust
-Scrollbar::new(&scroll_handle).side(Side::Left);
+Scrollbar::new(&scroll_handle).placement(ScrollbarPlacement::BottomLeft);
 ```
+
+| Placement               | Vertical scrollbar | Horizontal scrollbar |
+| ----------------------- | ------------------ | -------------------- |
+| `BottomRight` (default) | Right              | Bottom               |
+| `BottomLeft`            | Left               | Bottom               |
+| `TopRight`              | Right              | Top                  |
+| `TopLeft`               | Left               | Top                  |
+
+A single-axis scrollbar uses only the part of the placement for its axis. When
+both scrollbars are shown, the vertical track keeps the full height and the
+horizontal track stops short of it on the vertical scrollbar's side.
 
 The scrollbar is an absolute overlay. Its layout and hitboxes stay fixed while
 the painted track and thumb animate, so entrance motion does not move content or
@@ -190,8 +200,8 @@ The example theme above produces this choreography:
 | Thumb hover in `Hover` mode           | `thumb_hover_entrance`: slide from the nearest edge while fading |
 | `Always` mode                         | Immediate; visibility motion is skipped                          |
 
-For `SlideAndFade`, a vertical scrollbar enters from its side and a horizontal
-scrollbar enters from the bottom. Opacity uses linear entrance progress;
+For `SlideAndFade`, each scrollbar enters from the edge it sits on: the left or
+right for a vertical scrollbar, the top or bottom for a horizontal one. Opacity uses linear entrance progress;
 position uses cubic ease-out. Exit opacity and position use cubic ease-in.
 
 An interrupted transition samples its current opacity and position before

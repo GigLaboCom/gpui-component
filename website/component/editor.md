@@ -118,11 +118,14 @@ let editor = cx.new(|cx| {
 });
 ```
 
-The vertical scrollbar sits on the right edge by default. Use `scrollbar_side`
-to put it on the editor's left edge, over the line numbers:
+The scrollbars sit on the right and bottom edges by default. Use
+`scrollbar_placement` to move them; a vertical scrollbar on the left sits on
+the editor's left edge, over the line numbers. Like the bottom scrollbar over
+the last line, a top scrollbar overlays the first line rather than reserving
+space for itself. `set_scrollbar_placement` replaces the placement at runtime.
 
 ```rust
-EditorState::new(window, cx).scrollbar_side(Side::Left)
+EditorState::new(window, cx).scrollbar_placement(ScrollbarPlacement::BottomLeft)
 ```
 
 ## Keyboard shortcuts and column selection
